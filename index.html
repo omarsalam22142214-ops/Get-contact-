@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GetContact Clone</title>
+    <style>
+        :root {
+            --primary-blue: #0052cc;
+            --bg-light: #f0f2f5;
+            --text-dark: #1c1e21;
+            --tag-bg: #e4e6eb;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-light);
+            color: var(--text-dark);
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .app-container {
+            background-color: #ffffff;
+            width: 100%;
+            max-width: 400px;
+            min-height: 600px;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            background-color: var(--primary-blue);
+            color: white;
+            padding: 30px 20px 20px;
+            text-align: center;
+            border-bottom-left-radius: 20px;
+            border-bottom-right-radius: 20px;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 700;
+        }
+
+        .search-area {
+            padding: 25px 20px;
+            flex-grow: 1;
+        }
+
+        .search-box {
+            position: relative;
+            margin-bottom: 20px;
+        }
+
+        input[type="tel"] {
+            width: 100%;
+            padding: 15px;
+            padding-right: 20px;
+            border: 2px solid #e1e4e8;
+            border-radius: 12px;
+            font-size: 16px;
+            box-sizing: border-box;
+            outline: none;
+            transition: border-color 0.3s;
+            direction: ltr;
+            text-align: left;
+        }
+
+        input[type="tel"]:focus {
+            border-color: var(--primary-blue);
+        }
+
+        button.search-btn {
+            width: 100%;
+            background-color: var(--primary-blue);
+            color: white;
+            border: none;
+            padding: 15px;
+            border-radius: 12px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: opacity 0.3s;
+        }
+
+        button.search-btn:hover {
+            opacity: 0.9;
+        }
+
+        .results-container {
+            display: none;
+            margin-top: 20px;
+        }
+
+        .results-header {
+            font-size: 16px;
+            color: #65676b;
+            margin-bottom: 15px;
+            font-weight: 600;
+        }
+
+        .tags-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .tag {
+            background-color: var(--tag-bg);
+            padding: 10px 15px;
+            border-radius: 20px;
+            font-size: 15px;
+            color: var(--text-dark);
+            font-weight: 500;
+        }
+
+        .tag::before {
+            content: '# ';
+            color: var(--primary-blue);
+            font-weight: bold;
+        }
+
+        .error-msg {
+            color: #dc3545;
+            text-align: center;
+            margin-top: 20px;
+            font-weight: bold;
+            display: none;
+        }
+
+        /* Loading Animation */
+        .spinner {
+            display: none;
+            margin: 30px auto;
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(0, 82, 204, 0.2);
+            border-left-color: var(--primary-blue);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="app-container">
+        <div class="header">
+            <h1>البحث عن الأرقام</h1>
+            <p style="margin: 10px 0 0; font-size: 14px; opacity: 0.9;">اكتشف كيف يسجل الآخرون هذا الرقم</p>
+        </div>
+
+        <div class="search-area">
+            <div class="search-box">
+                <input type="tel" id="searchInput" placeholder="أدخل رقم الموبايل (مثال: 01012345678)" autocomplete="off">
+            </div>
+            <button class="search-btn" onclick="performSearch()">بحث</button>
+
+            <div class="spinner" id="spinner"></div>
+
+            <div class="error-msg" id="errorMsg">لم يتم العثور على نتائج لهذا الرقم.</div>
+
+            <div class="results-container" id="resultsContainer">
+                <div class="results-header" id="resultsCount">العلامات (Tags) المحتملة:</div>
+                <div class="tags-list" id="tagsList">
+                    <!-- التاجز هتظهر هنا -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function performSearch() {
+            const input = document.getElementById('searchInput').value.trim();
+            const spinner = document.getElementById('spinner');
+            const resultsContainer = document.getElementById('resultsContainer');
+            const tagsList = document.getElementById('tagsList');
+            const errorMsg = document.getElementById('errorMsg');
+            const resultsCount = document.getElementById('resultsCount');
+
+            // تصفير الواجهة قبل كل بحث جديد
+            resultsContainer.style.display = 'none';
+            errorMsg.style.display = 'none';
+            tagsList.innerHTML = '';
+
+            // التأكد إن المستخدم كتب رقم
+            if (!input) {
+                errorMsg.innerText = "أدخل رقم صحيح أولاً!";
+                errorMsg.style.display = 'block';
+                return;
+            }
+
+            // تشغيل علامة التحميل (اللودر)
+            spinner.style.display = 'block';
+
+            try {
+                // الاتصال بالسيرفر الحقيقي بتاعنا على اللوكال هوست
+                const response = await fetch(`http://localhost:3000/api/search?phone=${input}`);
+                
+                // لو السيرفر مقفول أو فيه مشكلة
+                if (!response.ok) {
+                    throw new Error('مشكلة في السيرفر');
+                }
+
+                const data = await response.json();
+                spinner.style.display = 'none';
+
+                // لو السيرفر رجع داتا (Tags)
+                if (data.tags && data.tags.length > 0) {
+                    resultsCount.innerText = `تم العثور على ${data.tags.length} علامات (Tags):`;
+                    
+                    // رسم كل Tag في الشاشة
+                    data.tags.forEach(tag => {
+                        const tagElement = document.createElement('div');
+                        tagElement.className = 'tag';
+                        tagElement.innerText = tag;
+                        tagsList.appendChild(tagElement);
+                    });
+                    resultsContainer.style.display = 'block';
+                } else {
+                    // لو الرقم مش موجود في الداتا بيز
+                    errorMsg.innerText = "لم يتم العثور على أي بيانات (Tags) لهذا الرقم.";
+                    errorMsg.style.display = 'block';
+                }
+            } catch (err) {
+                // لو حصل أي خطأ في الاتصال بالسيرفر
+                spinner.style.display = 'none';
+                console.error(err);
+                errorMsg.innerText = "حدث خطأ في الاتصال بالسيرفر. اتأكد إن السيرفر (Node.js) شغال.";
+                errorMsg.style.display = 'block';
+            }
+        }
+    </script>
+</body>
+</html>
